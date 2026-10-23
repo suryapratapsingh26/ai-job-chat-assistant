@@ -1,3 +1,4 @@
 from .job import Job
+from .resume import ResumeParseResponse, ResumeProfile
 
-__all__ = ["Job"]
+__all__ = ["Job", "ResumeParseResponse", "ResumeProfile"]

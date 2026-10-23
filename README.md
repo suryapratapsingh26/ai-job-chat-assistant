@@ -15,7 +15,11 @@ python -m pip install -r backend/requirements.txt
 python -m uvicorn backend.app.main:app --reload
 ```
 
+The backend requirements include `pypdf` for PDF extraction, `python-docx` for DOCX extraction, and `python-multipart` for multipart uploads.
+
 The existing `GET /health` endpoint returns API status. `GET /api/jobs?offset=0&limit=100` returns a page of general listings and the total dataset count. FastAPI allows the local Vite origins `http://localhost:5173` and `http://127.0.0.1:5173` by default. Set `FRONTEND_ORIGINS` to a comma-separated list of exact origins to change this allowlist.
+
+`POST /api/resume/parse` accepts a multipart `file` field with a PDF or DOCX resume (up to 10 MB) and returns a structured candidate profile. Text extraction and profile parsing run in memory; uploads are not saved. Scanned/image-only PDFs and password-protected PDFs are not supported. Profile parsing uses deterministic text/section heuristics and may leave fields empty when they are not clearly present.
 
 ## Frontend
 
@@ -29,7 +33,7 @@ npm run dev
 
 Vite serves the app at `http://127.0.0.1:5173`. The API client uses `http://localhost:8000` by default. Copy `frontend/.env.example` to `frontend/.env.local` and set `VITE_API_BASE_URL` to change the backend base URL, then restart Vite.
 
-The frontend includes a conversational workspace, a client-side PDF/DOCX file selector, and a job-listings panel connected to `GET /api/jobs`. It displays general listings only. Selected resumes remain in the browser; no upload or parsing endpoint is connected. Chat messages are local to the page and do not trigger job search, filtering, or AI responses.
+The frontend includes a conversational workspace, a PDF/DOCX resume upload and parsed-profile view, and a job-listings panel connected to `GET /api/jobs`. Chat messages are local to the page and do not trigger job search, filtering, or AI responses.
 
 ## Job data pipeline
 

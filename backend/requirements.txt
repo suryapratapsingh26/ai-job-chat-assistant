@@ -1,3 +1,6 @@
 fastapi==0.161.1
 pydantic==2.14.1
 uvicorn==0.54.0
+pypdf==6.21.2
+python-docx==1.2.0
+python-multipart==0.0.32
