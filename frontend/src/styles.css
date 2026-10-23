@@ -61,6 +61,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .chat-composer:focus-within { border-color: #8db8aa; }
 .chat-composer textarea { display: block; width: 100%; min-height: 25px; max-height: 100px; resize: vertical; border: 0; outline: 0; color: var(--ink); font-size: 11px; line-height: 1.5; background: transparent; }
 .chat-composer textarea::placeholder { color: #9ba7a1; }
+.chat-composer textarea:disabled { color: #89968f; cursor: wait; }
+.chat-typing { width: max-content; max-width: 90%; margin: 12px 0 0 36px; padding: 8px 11px; border-radius: 4px 10px 10px; background: #f3f6f3; color: #718079; font-size: 10px; }
 .send-button { position: absolute; top: 9px; right: 9px; width: 30px; height: 30px; border: 0; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: white; cursor: pointer; }
 .send-button:hover:not(:disabled) { background: var(--accent-dark); }
 .send-button:disabled { background: #dce6e1; color: #a8b7b0; cursor: not-allowed; }
@@ -99,6 +101,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .results-panel { flex: 1 1 0; min-height: 0; padding: 16px; display: flex; flex-direction: column; overflow: hidden; }
 .results-heading { flex: 0 0 auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
 .results-count { padding: 4px 7px; border-radius: 6px; background: #eff5f1; color: #477467; font-size: 9px; font-weight: 600; white-space: nowrap; }
+.primary-action { flex: 0 0 auto; padding: 7px 10px; border: 0; border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; font-size: 9px; font-weight: 700; }
+.primary-action:hover { background: var(--accent-dark); }
+.result-filter-list { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 5px; padding: 0; margin: -4px 0 9px; list-style: none; }
+.result-filter-list li { padding: 4px 7px; border: 1px solid #e7ede8; border-radius: 5px; background: #f5f8f5; color: #62766c; font-size: 8px; }
 .results-intro { flex: 0 0 auto; margin: 4px 0 11px; }
 .results-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .job-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); grid-auto-rows: max-content; align-items: start; align-content: start; gap: 12px; padding: 1px 3px 3px 1px; }
@@ -113,6 +119,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .job-description { display: -webkit-box; overflow: hidden; margin: 7px 0 0; color: #77847e; font-size: 9px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .skill-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 0; margin: 8px 0 0; list-style: none; }
 .skill-list li { padding: 3px 6px; border-radius: 5px; background: #f1f5f2; color: #63756b; font-size: 8px; }
+.match-score { margin-left: auto; padding: 4px 6px; border-radius: 5px; background: #e9f4ee; color: #347460; font-size: 8px; font-weight: 700; }
+.matched-skills { display: flex; flex-wrap: wrap; gap: 4px; padding: 0; margin: 7px 0 0; list-style: none; }
+.matched-skills li { padding: 3px 6px; border-radius: 5px; background: #e9f4ee; color: #377765; font-size: 8px; }
+.match-reasons { display: grid; gap: 4px; padding-left: 14px; margin: 8px 0 0; color: #64766d; font-size: 8px; line-height: 1.4; }
 .job-apply-link { display: inline-flex; gap: 5px; align-items: center; align-self: flex-start; margin-top: auto; padding-top: 9px; color: #367765; font-size: 9px; font-weight: 700; text-decoration: none; }
 .job-apply-link:hover { color: #20594b; }
 .job-apply-link span { font-size: 12px; }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { jobService, matchingService } from '../services/api'
-import type { JobMatchResponse, JobRecommendation, ResumeProfile } from '../services/api'
+import type { ChatResponse, JobMatchResponse, JobRecommendation, ResumeProfile } from '../services/api'
 import type { Job, JobPage } from '../types/job'
 import { LoadingIndicator } from './LoadingIndicator'
 
@@ -53,7 +53,7 @@ function LoadingCards() {
   )
 }
 
-export function JobResults({ profile }: { profile: ResumeProfile | null }) {
+export function JobResults({ profile, chatResponse }: { profile: ResumeProfile | null; chatResponse: ChatResponse | null }) {
   const [page, setPage] = useState<JobPage | null>(null)
   const [state, setState] = useState<LoadState>('loading')
   const [error, setError] = useState('')
@@ -63,18 +63,31 @@ export function JobResults({ profile }: { profile: ResumeProfile | null }) {
   const [matching, setMatching] = useState(false)
   const [matchError, setMatchError] = useState('')
   const [showMatches, setShowMatches] = useState(false)
+  const [showChatResults, setShowChatResults] = useState(false)
+
+  const hasChatResults = Boolean(chatResponse && ['search_jobs', 'refine_jobs', 'explain_job', 'show_jobs'].includes(chatResponse.intent))
+  const showingChatResults = showChatResults && hasChatResults
 
   useEffect(() => {
     setRecommendations(null)
     setMatchError('')
     setShowMatches(false)
+    setShowChatResults(false)
   }, [profile])
+
+  useEffect(() => {
+    if (hasChatResults) {
+      setShowChatResults(true)
+      setShowMatches(false)
+    }
+  }, [chatResponse, hasChatResults])
 
   async function findMatches() {
     if (!profile) return
     setMatching(true)
     setMatchError('')
     setShowMatches(true)
+    setShowChatResults(false)
     try {
       const result = await matchingService.recommend(profile)
       setRecommendations(result)
@@ -118,16 +131,24 @@ export function JobResults({ profile }: { profile: ResumeProfile | null }) {
     <aside className="results-panel" aria-labelledby="jobs-heading">
       <div className="results-heading">
         <div>
-          <div className="section-eyebrow">{showMatches ? 'PERSONALIZED FROM YOUR PROFILE' : 'EXPLORE'}</div>
-          <h2 id="jobs-heading">{showMatches ? 'Recommended jobs' : 'Job listings'}</h2>
+          <div className="section-eyebrow">
+            {showingChatResults ? (chatResponse?.personalized ? 'RESUME MATCHES' : 'GENERAL SEARCH') : showMatches ? 'PERSONALIZED FROM YOUR PROFILE' : 'EXPLORE'}
+          </div>
+          <h2 id="jobs-heading">{showingChatResults ? 'Chat results' : showMatches ? 'Recommended jobs' : 'Job listings'}</h2>
         </div>
+        {showingChatResults && <span className="results-count">{chatResponse?.jobs.length ?? 0} jobs</span>}
         {showMatches && !matching && recommendations && <span className="results-count">{recommendations.total_matches.toLocaleString()} matches</span>}
-        {profile && !showMatches && <button type="button" className="primary-action" onClick={() => void findMatches()}>Find matching jobs</button>}
-        {showMatches && <button type="button" className="text-button" onClick={() => setShowMatches(false)}>All listings</button>}
+        {profile && !showMatches && !showingChatResults && <button type="button" className="primary-action" onClick={() => void findMatches()}>Find matching jobs</button>}
+        {(showMatches || showingChatResults) && <button type="button" className="text-button" onClick={() => { setShowMatches(false); setShowChatResults(false) }}>All listings</button>}
       </div>
-      <p className="results-intro">{showMatches ? 'Ranked by skills, role, experience, and relevant resume details.' : 'General opportunities from our job dataset.'}</p>
+      <p className="results-intro">
+        {showingChatResults
+          ? chatResponse?.personalized ? 'Ranked resume matches refined by your conversation.' : 'General listings filtered from the existing job dataset. No resume match score is applied.'
+          : showMatches ? 'Ranked by skills, role, experience, and relevant resume details.' : 'General opportunities from our job dataset.'}
+      </p>
+      {showingChatResults && chatResponse && <ActiveFilters filters={chatResponse.active_filters} />}
       <div className="results-scroll" aria-label="Job listings">
-        {!showMatches && state === 'loading' && <LoadingCards />}
+        {!showMatches && !showingChatResults && state === 'loading' && <LoadingCards />}
         {showMatches && matching && <LoadingIndicator label="Finding jobs that fit your profile"><div className="match-loading-space" /></LoadingIndicator>}
         {showMatches && !matching && matchError && (
           <div className="results-message error-state" role="alert">
@@ -151,7 +172,26 @@ export function JobResults({ profile }: { profile: ResumeProfile | null }) {
             ))}
           </div>
         )}
-        {!showMatches && state === 'error' && (
+        {showingChatResults && chatResponse?.jobs.length === 0 && (
+          <div className="results-message">
+            <span className="state-icon">⌕</span>
+            <h3>No jobs found</h3>
+            <p>{chatResponse.assistant_message}</p>
+          </div>
+        )}
+        {showingChatResults && chatResponse && chatResponse.recommendations.length > 0 && (
+          <div className="job-grid">
+            {chatResponse.recommendations.map((recommendation) => (
+              <JobCard key={recommendation.job.job_id} job={recommendation.job} recommendation={recommendation} />
+            ))}
+          </div>
+        )}
+        {showingChatResults && chatResponse && !chatResponse.personalized && chatResponse.jobs.length > 0 && (
+          <div className="job-grid">
+            {chatResponse.jobs.map((job) => <JobCard key={job.job_id} job={job} />)}
+          </div>
+        )}
+        {!showMatches && !showingChatResults && state === 'error' && (
           <div className="results-message error-state" role="alert">
             <span className="state-icon">!</span>
             <h3>Listings aren’t available</h3>
@@ -159,7 +199,7 @@ export function JobResults({ profile }: { profile: ResumeProfile | null }) {
             <button type="button" className="text-button" onClick={() => void loadJobs()}>Try again <span aria-hidden="true">↻</span></button>
           </div>
         )}
-        {!showMatches && state === 'empty' && (
+        {!showMatches && !showingChatResults && state === 'empty' && (
           <div className="results-message">
             <span className="state-icon">⌕</span>
             <h3>No listings yet</h3>
@@ -167,13 +207,13 @@ export function JobResults({ profile }: { profile: ResumeProfile | null }) {
             <button type="button" className="text-button" onClick={() => void loadJobs()}>Refresh listings <span aria-hidden="true">↻</span></button>
           </div>
         )}
-        {!showMatches && state === 'success' && (
+        {!showMatches && !showingChatResults && state === 'success' && (
           <div className="job-grid">
             {page?.jobs.map((job) => <JobCard key={job.job_id} job={job} />)}
           </div>
         )}
       </div>
-      {!showMatches && state === 'success' && page && (
+      {!showMatches && !showingChatResults && state === 'success' && page && (
         <div className="results-footer">
           <p className="listings-footnote">Showing {page.jobs.length} of {page.total.toLocaleString()} available listings.</p>
           {moreError && <p className="field-error" role="alert">{moreError}</p>}
@@ -186,4 +226,16 @@ export function JobResults({ profile }: { profile: ResumeProfile | null }) {
       )}
     </aside>
   )
+}
+
+function ActiveFilters({ filters }: { filters: ChatResponse['active_filters'] }) {
+  const values = [
+    ...filters.skills,
+    filters.location,
+    filters.remote === true ? 'Remote' : filters.remote === false ? 'Onsite' : null,
+    filters.role,
+    filters.experience_level ? `${filters.experience_level} level` : null,
+  ].filter((value): value is string => Boolean(value))
+  if (!values.length) return null
+  return <ul className="result-filter-list" aria-label="Active search filters">{values.map((value) => <li key={value}>{value}</li>)}</ul>
 }

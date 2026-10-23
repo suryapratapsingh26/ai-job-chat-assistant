@@ -48,6 +48,71 @@ export interface JobMatchResponse {
   recommendations: JobRecommendation[]
 }
 
+export interface ChatFilters {
+  skills: string[]
+  location: string | null
+  remote: boolean | null
+  role: string | null
+  experience_level: 'intern' | 'entry' | 'junior' | 'mid' | 'senior' | 'lead' | null
+}
+
+export interface ChatTurn {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface ChatResponse {
+  assistant_message: string
+  intent: 'search_jobs' | 'refine_jobs' | 'explain_job' | 'show_jobs' | 'general' | 'error'
+  jobs: Job[]
+  recommendations: JobRecommendation[]
+  active_filters: ChatFilters
+  personalized: boolean
+  error: string | null
+}
+
+export const chatService = {
+  async send(
+    message: string,
+    profile: ResumeProfile | null,
+    history: ChatTurn[],
+    activeFilters: ChatFilters,
+    currentJobIds: string[],
+  ): Promise<ChatResponse> {
+    let response: Response
+    try {
+      response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          profile,
+          history: history.slice(-20),
+          active_filters: activeFilters,
+          current_job_ids: currentJobIds.slice(0, 100),
+        }),
+      })
+    } catch {
+      throw new Error('Could not reach the conversational search service. Check that the API is running and try again.')
+    }
+    const payload = await response.json().catch(() => null) as
+      | (ChatResponse & { detail?: unknown })
+      | null
+    if (!response.ok) {
+      const messageText = typeof payload?.detail === 'string'
+        ? payload.detail
+        : typeof payload?.error === 'string'
+          ? payload.error
+          : `Conversational search failed (${response.status}). Please try again.`
+      throw new Error(messageText)
+    }
+    if (!payload || typeof payload.assistant_message !== 'string') {
+      throw new Error('The assistant returned an incomplete response. Please try again.')
+    }
+    return payload
+  },
+}
+
 export const matchingService = {
   async recommend(profile: ResumeProfile, limit = 24): Promise<JobMatchResponse> {
     let response: Response

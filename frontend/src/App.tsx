@@ -3,10 +3,11 @@ import { BrandMark } from './components/BrandMark'
 import { ChatWindow } from './components/ChatWindow'
 import { JobResults } from './components/JobResults'
 import { ResumeUpload } from './components/ResumeUpload'
-import type { ResumeProfile } from './services/api'
+import type { ChatResponse, ResumeProfile } from './services/api'
 
 export default function App() {
   const [profile, setProfile] = useState<ResumeProfile | null>(null)
+  const [chatResponse, setChatResponse] = useState<ChatResponse | null>(null)
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -21,16 +22,16 @@ export default function App() {
       </header>
       <main id="main" className="workspace">
         <div className="primary-column">
-          <ChatWindow />
+          <ChatWindow profile={profile} onResponse={setChatResponse} />
         </div>
         <div className="support-column">
           <ResumeUpload onProfileParsed={setProfile} />
-          <JobResults profile={profile} />
+          <JobResults profile={profile} chatResponse={chatResponse} />
         </div>
       </main>
       <footer className="app-footer">
         <span>Built to make your next move clearer.</span>
-        <span>Listings are general and not personalized.</span>
+        <span>Chat results can be general or personalized with your resume.</span>
       </footer>
     </div>
   )
