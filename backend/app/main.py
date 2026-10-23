@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.resume import router as resume_router
 from backend.app.api.jobs import router as jobs_router
+from backend.app.api.chat import router as chat_router
 from backend.app.services.job_dataset import JobDataset
 
 app = FastAPI(title="AI Job Chat Assistant")
@@ -25,6 +26,7 @@ app.add_middleware(
 dataset = JobDataset()
 app.include_router(resume_router)
 app.include_router(jobs_router)
+app.include_router(chat_router)
 
 
 @app.get("/health")
