@@ -21,6 +21,8 @@ The existing `GET /health` endpoint returns API status. `GET /api/jobs?offset=0&
 
 `POST /api/resume/parse` accepts a multipart `file` field with a PDF or DOCX resume (up to 10 MB) and returns a structured candidate profile. Text extraction and profile parsing run in memory; uploads are not saved. Scanned/image-only PDFs and password-protected PDFs are not supported. Profile parsing uses deterministic text/section heuristics and may leave fields empty when they are not clearly present.
 
+`POST /api/jobs/match?limit=24` accepts `{ "profile": <parsed profile> }` and returns ranked recommendations from the existing dataset. The limit is optional and supports 1–100 results. Matching is deterministic: skills carry 60% of the weight, title alignment 25%, experience compatibility 10%, and resume experience/project description overlap 5%; unavailable signals are excluded and remaining weights are normalized. Each result includes its 0–100 score, matched skills, reasons, and per-signal scores. The resume upload panel offers “Find matching jobs” after parsing; files and profiles are not stored by the API.
+
 ## Frontend
 
 In a second terminal:
@@ -33,7 +35,7 @@ npm run dev
 
 Vite serves the app at `http://127.0.0.1:5173`. The API client uses `http://localhost:8000` by default. Copy `frontend/.env.example` to `frontend/.env.local` and set `VITE_API_BASE_URL` to change the backend base URL, then restart Vite.
 
-The frontend includes a conversational workspace, a PDF/DOCX resume upload and parsed-profile view, and a job-listings panel connected to `GET /api/jobs`. Chat messages are local to the page and do not trigger job search, filtering, or AI responses.
+The frontend includes a conversational workspace, a PDF/DOCX resume upload and parsed-profile view, and a job-listings panel connected to `GET /api/jobs`. After parsing a resume, “Find matching jobs” requests recommendations from `POST /api/jobs/match`; chat messages remain local and do not trigger job search, filtering, or AI responses.
 
 ## Job data pipeline
 
@@ -50,4 +52,4 @@ Scraper settings such as `SCRAPER_MAX_JOBS`, request delay, timeout, retries, ma
 
 ## Later stages
 
-Resume parsing, job matching and recommendations, conversational refinement, agent orchestration, job application, and application tracking are not implemented yet. These will be added in later stages; the current UI does not claim these capabilities.
+Conversational refinement, agent orchestration, job application, and application tracking are not implemented yet. These belong to later stages; chat does not currently refine recommendations.

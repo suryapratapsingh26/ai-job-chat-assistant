@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { BrandMark } from './components/BrandMark'
 import { ChatWindow } from './components/ChatWindow'
 import { JobResults } from './components/JobResults'
 import { ResumeUpload } from './components/ResumeUpload'
+import type { ResumeProfile } from './services/api'
 
 export default function App() {
+  const [profile, setProfile] = useState<ResumeProfile | null>(null)
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -21,8 +24,8 @@ export default function App() {
           <ChatWindow />
         </div>
         <div className="support-column">
-          <ResumeUpload />
-          <JobResults />
+          <ResumeUpload onProfileParsed={setProfile} />
+          <JobResults profile={profile} />
         </div>
       </main>
       <footer className="app-footer">

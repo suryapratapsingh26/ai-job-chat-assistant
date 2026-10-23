@@ -12,7 +12,7 @@ function supported(file: File) {
   return extensionIsValid && mimeIsValid
 }
 
-export function ResumeUpload() {
+export function ResumeUpload({ onProfileParsed }: { onProfileParsed: (profile: ResumeProfile | null) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [filename, setFilename] = useState('')
   const [error, setError] = useState('')
@@ -24,6 +24,7 @@ export function ResumeUpload() {
     if (!file) return
     setError('')
     setProfile(null)
+    onProfileParsed(null)
     if (!supported(file)) {
       setFilename('')
       setError('Choose a PDF or DOCX file to continue.')
@@ -41,6 +42,7 @@ export function ResumeUpload() {
     try {
       const parsedProfile = await resumeService.parse(file)
       setProfile(parsedProfile)
+      onProfileParsed(parsedProfile)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not process this resume. Please try again.')
     } finally {

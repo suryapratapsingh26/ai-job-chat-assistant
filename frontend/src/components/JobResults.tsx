@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
-import { jobService } from '../services/api'
+import { jobService, matchingService } from '../services/api'
+import type { JobMatchResponse, JobRecommendation, ResumeProfile } from '../services/api'
 import type { Job, JobPage } from '../types/job'
 import { LoadingIndicator } from './LoadingIndicator'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error'
 
-function JobCard({ job }: { job: Job }) {
+function JobCard({ job, recommendation }: { job: Job; recommendation?: JobRecommendation }) {
   const summary = job.description.length > 220 ? `${job.description.slice(0, 220).trimEnd()}…` : job.description
   return (
     <article className="job-card">
       <div className="job-card-topline">
         <div className="company-monogram" aria-hidden="true">{job.company.slice(0, 1).toUpperCase()}</div>
+        {recommendation && <span className="match-score">{recommendation.match_score}% match</span>}
         <a className="source-link" href={job.source_link} target="_blank" rel="noreferrer" aria-label={`View ${job.title} at source`}>↗</a>
       </div>
       <h3>{job.title}</h3>
@@ -24,6 +26,16 @@ function JobCard({ job }: { job: Job }) {
         <ul className="skill-list" aria-label="Skills">
           {job.skills.slice(0, 4).map((skill) => <li key={skill}>{skill}</li>)}
           {job.skills.length > 4 && <li>+{job.skills.length - 4}</li>}
+        </ul>
+      )}
+      {recommendation && recommendation.matched_skills.length > 0 && (
+        <ul className="matched-skills" aria-label="Matched skills">
+          {recommendation.matched_skills.slice(0, 5).map((skill) => <li key={skill}>{skill}</li>)}
+        </ul>
+      )}
+      {recommendation && recommendation.match_reasons.length > 0 && (
+        <ul className="match-reasons" aria-label="Why this job matches">
+          {recommendation.match_reasons.map((reason) => <li key={reason}>{reason}</li>)}
         </ul>
       )}
       <a className="job-apply-link" href={job.source_link} target="_blank" rel="noreferrer">View listing <span aria-hidden="true">→</span></a>
@@ -41,12 +53,37 @@ function LoadingCards() {
   )
 }
 
-export function JobResults() {
+export function JobResults({ profile }: { profile: ResumeProfile | null }) {
   const [page, setPage] = useState<JobPage | null>(null)
   const [state, setState] = useState<LoadState>('loading')
   const [error, setError] = useState('')
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState('')
+  const [recommendations, setRecommendations] = useState<JobMatchResponse | null>(null)
+  const [matching, setMatching] = useState(false)
+  const [matchError, setMatchError] = useState('')
+  const [showMatches, setShowMatches] = useState(false)
+
+  useEffect(() => {
+    setRecommendations(null)
+    setMatchError('')
+    setShowMatches(false)
+  }, [profile])
+
+  async function findMatches() {
+    if (!profile) return
+    setMatching(true)
+    setMatchError('')
+    setShowMatches(true)
+    try {
+      const result = await matchingService.recommend(profile)
+      setRecommendations(result)
+    } catch (reason) {
+      setMatchError(reason instanceof Error ? reason.message : 'Could not find matching jobs.')
+    } finally {
+      setMatching(false)
+    }
+  }
 
   async function loadJobs(offset = 0) {
     if (offset === 0) {
@@ -81,15 +118,40 @@ export function JobResults() {
     <aside className="results-panel" aria-labelledby="jobs-heading">
       <div className="results-heading">
         <div>
-          <div className="section-eyebrow">EXPLORE</div>
-          <h2 id="jobs-heading">Job listings</h2>
+          <div className="section-eyebrow">{showMatches ? 'PERSONALIZED FROM YOUR PROFILE' : 'EXPLORE'}</div>
+          <h2 id="jobs-heading">{showMatches ? 'Recommended jobs' : 'Job listings'}</h2>
         </div>
-        {state === 'success' && <span className="results-count">{page?.total.toLocaleString()} roles</span>}
+        {showMatches && !matching && recommendations && <span className="results-count">{recommendations.total_matches.toLocaleString()} matches</span>}
+        {profile && !showMatches && <button type="button" className="primary-action" onClick={() => void findMatches()}>Find matching jobs</button>}
+        {showMatches && <button type="button" className="text-button" onClick={() => setShowMatches(false)}>All listings</button>}
       </div>
-      <p className="results-intro">General opportunities from our job dataset.</p>
+      <p className="results-intro">{showMatches ? 'Ranked by skills, role, experience, and relevant resume details.' : 'General opportunities from our job dataset.'}</p>
       <div className="results-scroll" aria-label="Job listings">
-        {state === 'loading' && <LoadingCards />}
-        {state === 'error' && (
+        {!showMatches && state === 'loading' && <LoadingCards />}
+        {showMatches && matching && <LoadingIndicator label="Finding jobs that fit your profile"><div className="match-loading-space" /></LoadingIndicator>}
+        {showMatches && !matching && matchError && (
+          <div className="results-message error-state" role="alert">
+            <span className="state-icon">!</span>
+            <h3>Recommendations aren’t available</h3>
+            <p>{matchError}</p>
+            <button type="button" className="text-button" onClick={() => void findMatches()}>Try again <span aria-hidden="true">↻</span></button>
+          </div>
+        )}
+        {showMatches && !matching && !matchError && recommendations?.recommendations.length === 0 && (
+          <div className="results-message">
+            <span className="state-icon">⌕</span>
+            <h3>No matching jobs found</h3>
+            <p>Try a resume with more role or skill details to find relevant listings.</p>
+          </div>
+        )}
+        {showMatches && !matching && !matchError && recommendations && recommendations.recommendations.length > 0 && (
+          <div className="job-grid">
+            {recommendations.recommendations.map((recommendation) => (
+              <JobCard key={recommendation.job.job_id} job={recommendation.job} recommendation={recommendation} />
+            ))}
+          </div>
+        )}
+        {!showMatches && state === 'error' && (
           <div className="results-message error-state" role="alert">
             <span className="state-icon">!</span>
             <h3>Listings aren’t available</h3>
@@ -97,7 +159,7 @@ export function JobResults() {
             <button type="button" className="text-button" onClick={() => void loadJobs()}>Try again <span aria-hidden="true">↻</span></button>
           </div>
         )}
-        {state === 'empty' && (
+        {!showMatches && state === 'empty' && (
           <div className="results-message">
             <span className="state-icon">⌕</span>
             <h3>No listings yet</h3>
@@ -105,13 +167,13 @@ export function JobResults() {
             <button type="button" className="text-button" onClick={() => void loadJobs()}>Refresh listings <span aria-hidden="true">↻</span></button>
           </div>
         )}
-        {state === 'success' && (
+        {!showMatches && state === 'success' && (
           <div className="job-grid">
             {page?.jobs.map((job) => <JobCard key={job.job_id} job={job} />)}
           </div>
         )}
       </div>
-      {state === 'success' && page && (
+      {!showMatches && state === 'success' && page && (
         <div className="results-footer">
           <p className="listings-footnote">Showing {page.jobs.length} of {page.total.toLocaleString()} available listings.</p>
           {moreError && <p className="field-error" role="alert">{moreError}</p>}
