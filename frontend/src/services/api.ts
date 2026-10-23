@@ -1,4 +1,4 @@
-import type { JobPage } from '../types/job'
+import type { Job, JobPage } from '../types/job'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '')
 
@@ -26,6 +26,54 @@ export interface ResumeProfile {
   experience: string | null
   education: string[]
   projects: string[]
+}
+
+export interface MatchScoringDetails {
+  skills: number | null
+  title: number | null
+  experience: number | null
+  description: number | null
+}
+
+export interface JobRecommendation {
+  job: Job
+  match_score: number
+  matched_skills: string[]
+  match_reasons: string[]
+  scoring_details: MatchScoringDetails
+}
+
+export interface JobMatchResponse {
+  total_matches: number
+  recommendations: JobRecommendation[]
+}
+
+export const matchingService = {
+  async recommend(profile: ResumeProfile, limit = 24): Promise<JobMatchResponse> {
+    let response: Response
+    try {
+      response = await fetch(`${API_BASE_URL}/api/jobs/match?limit=${limit}`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile }),
+      })
+    } catch {
+      throw new Error('Could not reach the job matching service. Check that the API is running and try again.')
+    }
+    const payload = await response.json().catch(() => null) as
+      | (JobMatchResponse & { detail?: unknown })
+      | null
+    if (!response.ok) {
+      const message = typeof payload?.detail === 'string'
+        ? payload.detail
+        : `Job matching failed (${response.status}). Check the profile and try again.`
+      throw new Error(message)
+    }
+    if (!payload || !Array.isArray(payload.recommendations)) {
+      throw new Error('The server returned an incomplete recommendation list. Please try again.')
+    }
+    return payload
+  },
 }
 
 export const resumeService = {
