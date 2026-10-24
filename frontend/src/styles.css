@@ -111,6 +111,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .job-card { min-width: 0; padding: 12px; border: 1px solid #e9eeea; border-radius: 9px; background: #fff; display: flex; flex-direction: column; }
 .job-card-topline { display: flex; justify-content: space-between; align-items: center; }
 .company-monogram { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px; background: #edf3ef; color: #4f7367; font-size: 10px; font-weight: 700; }
+.job-position { margin-right: auto; margin-left: 8px; color: #687870; font-size: 9px; font-weight: 700; }
+.job-application-status { margin: 7px 0 0; color: #3d705b; font-size: 9px; font-weight: 600; }
+.track-application-button { align-self: flex-start; margin-top: 9px; border: 1px solid #d5e2da; border-radius: 6px; padding: 5px 8px; background: #f5f8f6; color: #3d705b; font-size: 9px; font-weight: 650; cursor: pointer; }
+.track-application-button:hover { background: #eaf2ed; }
 .source-link { color: #90a099; text-decoration: none; font-size: 16px; line-height: 1; }
 .source-link:hover { color: var(--accent); }
 .job-card h3 { margin: 7px 0 2px; color: #283831; font-size: 12px; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; }

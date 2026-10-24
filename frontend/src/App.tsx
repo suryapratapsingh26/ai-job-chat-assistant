@@ -8,6 +8,8 @@ import type { ChatResponse, ResumeProfile } from './services/api'
 export default function App() {
   const [profile, setProfile] = useState<ResumeProfile | null>(null)
   const [chatResponse, setChatResponse] = useState<ChatResponse | null>(null)
+  const [visibleJobIds, setVisibleJobIds] = useState<string[]>([])
+  const [applyRequest, setApplyRequest] = useState<{ jobId: string; requestId: string } | null>(null)
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -22,11 +24,22 @@ export default function App() {
       </header>
       <main id="main" className="workspace">
         <div className="primary-column">
-          <ChatWindow profile={profile} onResponse={setChatResponse} />
+          <ChatWindow
+            profile={profile}
+            onResponse={setChatResponse}
+            visibleJobIds={visibleJobIds}
+            applyRequest={applyRequest}
+            onApplyRequestHandled={() => setApplyRequest(null)}
+          />
         </div>
         <div className="support-column">
           <ResumeUpload onProfileParsed={setProfile} />
-          <JobResults profile={profile} chatResponse={chatResponse} />
+          <JobResults
+            profile={profile}
+            chatResponse={chatResponse}
+            onVisibleJobs={setVisibleJobIds}
+            onApplyJob={(jobId) => setApplyRequest({ jobId, requestId: crypto.randomUUID() })}
+          />
         </div>
       </main>
       <footer className="app-footer">

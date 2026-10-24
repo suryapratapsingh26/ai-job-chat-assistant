@@ -21,6 +21,11 @@ from backend.app.models.chat import (
 )
 from backend.app.models.job import Job
 from backend.app.models.matching import JobRecommendation
+from backend.app.services.application_service import (
+    ApplicationService,
+    DuplicateApplicationError,
+    JobNotFoundError,
+)
 from backend.app.services.job_matcher import match_jobs
 from backend.app.services.job_search import filter_jobs, filter_recommendations
 
@@ -30,15 +35,21 @@ logger = logging.getLogger(__name__)
 SYSTEM_INSTRUCTIONS = """You are the intent parser for a job-search assistant. Return only the supplied structured schema.
 Choose one allowed intent: search_jobs for a fresh job search, refine_jobs for changing the current search,
 explain_job for asking why a current result is relevant, show_jobs for repeating the current result list,
-or general for greetings/help/off-topic messages. Extract only constraints explicitly requested by the user.
+apply_job for applying to a job in the current result list, list_applications for showing saved applications,
+or general for greetings/help/off-topic messages. For apply_job, set job_reference to the one-based position
+only when the user specifies a job number; leave it null for "this job". The application service resolves
+the reference against backend-provided current result IDs. Never provide a job ID, date, or status. For
+list_applications, leave job_reference null. Extract only constraints explicitly requested by the user.
 Do not invent job facts, job IDs, actions, or filters. Skills must be short skill names. Location is a place name.
 Remote is true for remote-only and false for onsite-only; leave it null when not specified. Experience level
 must be one of intern, entry, junior, mid, senior, lead. For refinement, return only newly requested constraints;
 the application combines them with the current filters. Set replace_skills true when the user explicitly replaces
 the previous skill constraint (for example, "only React"), otherwise false. Set clear_filters true only when the
-user starts an unrelated fresh search or asks to clear/reset filters. For show_jobs and general, leave constraints
-empty. For explain_job, use explanation_index 0 for the first current result unless the user specifies another.
-When prior context clearly establishes a current search, interpret follow-ups as refinements and preserve other filters."""
+user starts an unrelated fresh search or asks to clear/reset filters. For show_jobs, apply_job, list_applications,
+and general, leave search constraints empty. For explain_job, use explanation_index 0 for the first current result
+unless the user specifies another.
+When prior context clearly establishes a current search, interpret ordinary search follow-ups as refinements and
+preserve other filters. Explicit apply and application-status requests keep their application intent."""
 
 
 class IntentParser(Protocol):
@@ -80,10 +91,11 @@ INTENT_PLAN_JSON_SCHEMA = {
         "replace_skills": {"type": "boolean"},
         "clear_filters": {"type": "boolean"},
         "explanation_index": {"type": ["integer", "null"]},
+        "job_reference": {"type": ["integer", "null"], "minimum": 1, "maximum": 1800},
     },
     "required": [
         "intent", "skills", "location", "remote", "role", "experience_level",
-        "replace_skills", "clear_filters", "explanation_index",
+        "replace_skills", "clear_filters", "explanation_index", "job_reference",
     ],
     "additionalProperties": False,
 }
@@ -261,8 +273,9 @@ def _explain_recommendation(recommendation: JobRecommendation) -> str:
 
 
 class JobChatOrchestrator:
-    def __init__(self, intent_parser: IntentParser):
+    def __init__(self, intent_parser: IntentParser, application_service: ApplicationService | None = None):
         self.intent_parser = intent_parser
+        self.application_service = application_service or ApplicationService()
 
     def handle(self, request: ChatRequest, jobs: Sequence[Job]) -> ChatResponse:
         plan = self.intent_parser.parse(request)
@@ -271,6 +284,71 @@ class JobChatOrchestrator:
                 plan = IntentPlan.model_validate(plan)
             except ValidationError as exc:
                 raise InvalidIntentPlanError("The assistant returned an invalid search plan.") from exc
+
+        if plan.intent is IntentAction.APPLY_JOB:
+            if request.selected_job_id is not None:
+                job_id = request.selected_job_id
+                if job_id not in request.current_job_ids:
+                    return ChatResponse(
+                        assistant_message="I couldn't identify that job in the current results. Ask to apply to a numbered job in the displayed list.",
+                        intent=ChatIntent.APPLY_JOB,
+                        active_filters=request.active_filters,
+                    )
+            else:
+                reference = plan.job_reference
+                if reference is None and len(request.current_job_ids) == 1:
+                    reference = 1
+                if reference is None or reference > len(request.current_job_ids):
+                    return ChatResponse(
+                        assistant_message="I couldn't identify that job in the current results. Ask to apply to a numbered job in the displayed list.",
+                        intent=ChatIntent.APPLY_JOB,
+                        active_filters=request.active_filters,
+                    )
+                job_id = request.current_job_ids[reference - 1]
+            job = next((item for item in jobs if item.job_id == job_id), None)
+            if job is None:
+                return ChatResponse(
+                    assistant_message="That job is no longer available in the current dataset. Please choose another displayed job.",
+                    intent=ChatIntent.APPLY_JOB,
+                    active_filters=request.active_filters,
+                )
+            try:
+                application = self.application_service.apply(job_id, jobs)
+                message = f"Application recorded for {job.title} at {job.company}. Status: {application.status.value}."
+            except DuplicateApplicationError:
+                application = next(
+                    item for item in self.application_service.list_applications(jobs)
+                    if item.job_id == job_id
+                )
+                message = f"You've already applied to {job.title} at {job.company}. Status: {application.status.value}."
+            except JobNotFoundError:
+                return ChatResponse(
+                    assistant_message="That job is no longer available in the current dataset. Please choose another displayed job.",
+                    intent=ChatIntent.APPLY_JOB,
+                    active_filters=request.active_filters,
+                )
+            return ChatResponse(
+                assistant_message=message,
+                intent=ChatIntent.APPLY_JOB,
+                jobs=[job],
+                applications=[application],
+                active_filters=request.active_filters,
+            )
+
+        if plan.intent is IntentAction.LIST_APPLICATIONS:
+            applications = self.application_service.list_applications(jobs)
+            application_jobs = [item.job for item in applications if item.job is not None]
+            message = (
+                f"You have {len(applications)} recorded application{'s' if len(applications) != 1 else ''}."
+                if applications else "You don't have any recorded applications yet."
+            )
+            return ChatResponse(
+                assistant_message=message,
+                intent=ChatIntent.LIST_APPLICATIONS,
+                jobs=application_jobs,
+                applications=applications,
+                active_filters=request.active_filters,
+            )
 
         if plan.intent is IntentAction.GENERAL:
             return ChatResponse(

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChatInput } from './ChatInput'
 import { MessageList } from './MessageList'
 import type { ChatMessage } from './MessageBubble'
@@ -12,25 +12,34 @@ const welcome: ChatMessage = {
 
 const emptyFilters: ChatFilters = { skills: [], location: null, remote: null, role: null, experience_level: null }
 
-export function ChatWindow({ profile, onResponse }: {
+export function ChatWindow({ profile, onResponse, visibleJobIds, applyRequest, onApplyRequestHandled }: {
   profile: ResumeProfile | null
   onResponse: (response: ChatResponse) => void
+  visibleJobIds: string[]
+  applyRequest: { jobId: string; requestId: string } | null
+  onApplyRequestHandled: () => void
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([welcome])
   const [activeFilters, setActiveFilters] = useState<ChatFilters>(emptyFilters)
-  const [currentJobIds, setCurrentJobIds] = useState<string[]>([])
   const [sending, setSending] = useState(false)
+  const handledApplyRequest = useRef<string | null>(null)
 
-  async function sendMessage(text: string) {
+  useEffect(() => {
+    if (!applyRequest || handledApplyRequest.current === applyRequest.requestId) return
+    handledApplyRequest.current = applyRequest.requestId
+    void sendMessage('Apply to this job', applyRequest.jobId)
+    onApplyRequestHandled()
+  }, [applyRequest])
+
+  async function sendMessage(text: string, selectedJobId?: string) {
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', text }
     const history: ChatTurn[] = [...messages.filter((message) => message.id !== 'welcome'), userMessage]
       .map(({ role, text: content }) => ({ role, content }))
     setMessages((current) => [...current, userMessage])
     setSending(true)
     try {
-      const response = await chatService.send(text, profile, history, activeFilters, currentJobIds)
+      const response = await chatService.send(text, profile, history, activeFilters, visibleJobIds, selectedJobId)
       setActiveFilters(response.active_filters)
-      setCurrentJobIds(response.jobs.map((job) => job.job_id))
       onResponse(response)
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', text: response.assistant_message }])
     } catch (reason) {
@@ -60,9 +69,9 @@ export function ChatWindow({ profile, onResponse }: {
             <li><span>02</span> Review profile matches</li>
             <li><span>03</span> Search the job dataset</li>
             <li><span>04</span> Refine results in chat</li>
-            <li><span>05</span> Apply on the employer site</li>
+            <li><span>05</span> Track applications here</li>
           </ol>
-          <p className="workflow-note">Chat searches use the job dataset. Resume matches are personalized; general searches do not use a match score.</p>
+          <p className="workflow-note">Ask “apply to job 1” to record an application. Pathfinder tracks its status; submit applications on the employer site.</p>
         </div>
       </div>
       <ChatInput onSend={sendMessage} disabled={sending} />
