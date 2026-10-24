@@ -16,6 +16,9 @@ frontend/dist/
 # Environment variables
 .env
 
+# Local application workflow data
+data/applications.json
+
 # IDE
 .vscode/
 

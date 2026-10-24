@@ -6,12 +6,19 @@ import { LoadingIndicator } from './LoadingIndicator'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error'
 
-function JobCard({ job, recommendation }: { job: Job; recommendation?: JobRecommendation }) {
+function JobCard({ job, recommendation, position, applicationStatus, onApplyJob }: {
+  job: Job
+  recommendation?: JobRecommendation
+  position: number
+  applicationStatus?: { status: string; applied_at: string }
+  onApplyJob: (jobId: string) => void
+}) {
   const summary = job.description.length > 220 ? `${job.description.slice(0, 220).trimEnd()}…` : job.description
   return (
     <article className="job-card">
       <div className="job-card-topline">
         <div className="company-monogram" aria-hidden="true">{job.company.slice(0, 1).toUpperCase()}</div>
+        <span className="job-position" aria-label={`Job ${position}`}>Job {position}</span>
         {recommendation && <span className="match-score">{recommendation.match_score}% match</span>}
         <a className="source-link" href={job.source_link} target="_blank" rel="noreferrer" aria-label={`View ${job.title} at source`}>↗</a>
       </div>
@@ -22,6 +29,8 @@ function JobCard({ job, recommendation }: { job: Job; recommendation?: JobRecomm
         {job.experience && <span>◷ {job.experience}</span>}
       </div>
       {summary && <p className="job-description">{summary}</p>}
+      {applicationStatus && <p className="job-application-status">Application {applicationStatus.status} · {new Date(applicationStatus.applied_at).toLocaleDateString()}</p>}
+      <button type="button" className="track-application-button" onClick={() => onApplyJob(job.job_id)}>Track application</button>
       {job.skills.length > 0 && (
         <ul className="skill-list" aria-label="Skills">
           {job.skills.slice(0, 4).map((skill) => <li key={skill}>{skill}</li>)}
@@ -53,7 +62,12 @@ function LoadingCards() {
   )
 }
 
-export function JobResults({ profile, chatResponse }: { profile: ResumeProfile | null; chatResponse: ChatResponse | null }) {
+export function JobResults({ profile, chatResponse, onVisibleJobs, onApplyJob }: {
+  profile: ResumeProfile | null
+  chatResponse: ChatResponse | null
+  onVisibleJobs: (jobIds: string[]) => void
+  onApplyJob: (jobId: string) => void
+}) {
   const [page, setPage] = useState<JobPage | null>(null)
   const [state, setState] = useState<LoadState>('loading')
   const [error, setError] = useState('')
@@ -65,7 +79,7 @@ export function JobResults({ profile, chatResponse }: { profile: ResumeProfile |
   const [showMatches, setShowMatches] = useState(false)
   const [showChatResults, setShowChatResults] = useState(false)
 
-  const hasChatResults = Boolean(chatResponse && ['search_jobs', 'refine_jobs', 'explain_job', 'show_jobs'].includes(chatResponse.intent))
+  const hasChatResults = Boolean(chatResponse && ['search_jobs', 'refine_jobs', 'explain_job', 'show_jobs', 'apply_job', 'list_applications'].includes(chatResponse.intent))
   const showingChatResults = showChatResults && hasChatResults
 
   useEffect(() => {
@@ -81,6 +95,18 @@ export function JobResults({ profile, chatResponse }: { profile: ResumeProfile |
       setShowMatches(false)
     }
   }, [chatResponse, hasChatResults])
+
+  useEffect(() => {
+    if (showingChatResults && chatResponse) {
+      onVisibleJobs(chatResponse.jobs.map((job) => job.job_id))
+    } else if (showMatches) {
+      onVisibleJobs(matching || !recommendations
+        ? []
+        : recommendations.recommendations.map((item) => item.job.job_id))
+    } else if (page) {
+      onVisibleJobs(page.jobs.map((job) => job.job_id))
+    }
+  }, [showingChatResults, chatResponse, showMatches, matching, recommendations, page, onVisibleJobs])
 
   async function findMatches() {
     if (!profile) return
@@ -108,9 +134,11 @@ export function JobResults({ profile, chatResponse }: { profile: ResumeProfile |
     }
     try {
       const result = await jobService.list(offset)
+      const visibleJobs = offset > 0 && page ? [...page.jobs, ...result.jobs] : result.jobs
       setPage((current) => offset > 0 && current
         ? { ...result, jobs: [...current.jobs, ...result.jobs] }
         : result)
+      onVisibleJobs(visibleJobs.map((job) => job.job_id))
       if (offset === 0) setState(result.jobs.length ? 'success' : 'empty')
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : 'Could not load job listings.'
@@ -132,21 +160,29 @@ export function JobResults({ profile, chatResponse }: { profile: ResumeProfile |
       <div className="results-heading">
         <div>
           <div className="section-eyebrow">
-            {showingChatResults ? (chatResponse?.personalized ? 'RESUME MATCHES' : 'GENERAL SEARCH') : showMatches ? 'PERSONALIZED FROM YOUR PROFILE' : 'EXPLORE'}
+            {showingChatResults
+              ? chatResponse?.intent === 'list_applications' || chatResponse?.intent === 'apply_job'
+                ? 'APPLICATION TRACKING'
+                : chatResponse?.personalized ? 'RESUME MATCHES' : 'GENERAL SEARCH'
+              : showMatches ? 'PERSONALIZED FROM YOUR PROFILE' : 'EXPLORE'}
           </div>
-          <h2 id="jobs-heading">{showingChatResults ? 'Chat results' : showMatches ? 'Recommended jobs' : 'Job listings'}</h2>
+          <h2 id="jobs-heading">{showingChatResults
+            ? chatResponse?.intent === 'list_applications' ? 'Applied jobs' : chatResponse?.intent === 'apply_job' ? 'Application' : 'Chat results'
+            : showMatches ? 'Recommended jobs' : 'Job listings'}</h2>
         </div>
-        {showingChatResults && <span className="results-count">{chatResponse?.jobs.length ?? 0} jobs</span>}
+        {showingChatResults && <span className="results-count">{chatResponse?.intent === 'list_applications' ? chatResponse.applications.length : chatResponse?.jobs.length ?? 0} {chatResponse?.intent === 'list_applications' ? 'applications' : 'jobs'}</span>}
         {showMatches && !matching && recommendations && <span className="results-count">{recommendations.total_matches.toLocaleString()} matches</span>}
         {profile && !showMatches && !showingChatResults && <button type="button" className="primary-action" onClick={() => void findMatches()}>Find matching jobs</button>}
         {(showMatches || showingChatResults) && <button type="button" className="text-button" onClick={() => { setShowMatches(false); setShowChatResults(false) }}>All listings</button>}
       </div>
       <p className="results-intro">
         {showingChatResults
-          ? chatResponse?.personalized ? 'Ranked resume matches refined by your conversation.' : 'General listings filtered from the existing job dataset. No resume match score is applied.'
+          ? chatResponse?.intent === 'list_applications' ? 'Your saved applications and their current statuses.'
+            : chatResponse?.intent === 'apply_job' ? 'Application status is recorded locally. Submit the application on the employer site.'
+              : chatResponse?.personalized ? 'Ranked resume matches refined by your conversation.' : 'General listings filtered from the existing job dataset. No resume match score is applied.'
           : showMatches ? 'Ranked by skills, role, experience, and relevant resume details.' : 'General opportunities from our job dataset.'}
       </p>
-      {showingChatResults && chatResponse && <ActiveFilters filters={chatResponse.active_filters} />}
+      {showingChatResults && chatResponse && !['apply_job', 'list_applications'].includes(chatResponse.intent) && <ActiveFilters filters={chatResponse.active_filters} />}
       <div className="results-scroll" aria-label="Job listings">
         {!showMatches && !showingChatResults && state === 'loading' && <LoadingCards />}
         {showMatches && matching && <LoadingIndicator label="Finding jobs that fit your profile"><div className="match-loading-space" /></LoadingIndicator>}
@@ -167,28 +203,28 @@ export function JobResults({ profile, chatResponse }: { profile: ResumeProfile |
         )}
         {showMatches && !matching && !matchError && recommendations && recommendations.recommendations.length > 0 && (
           <div className="job-grid">
-            {recommendations.recommendations.map((recommendation) => (
-              <JobCard key={recommendation.job.job_id} job={recommendation.job} recommendation={recommendation} />
+            {recommendations.recommendations.map((recommendation, index) => (
+              <JobCard key={recommendation.job.job_id} job={recommendation.job} recommendation={recommendation} position={index + 1} onApplyJob={onApplyJob} />
             ))}
           </div>
         )}
         {showingChatResults && chatResponse?.jobs.length === 0 && (
           <div className="results-message">
             <span className="state-icon">⌕</span>
-            <h3>No jobs found</h3>
+            <h3>{chatResponse.intent === 'list_applications' ? 'No applications yet' : chatResponse.intent === 'apply_job' ? 'Job not available' : 'No jobs found'}</h3>
             <p>{chatResponse.assistant_message}</p>
           </div>
         )}
         {showingChatResults && chatResponse && chatResponse.recommendations.length > 0 && (
           <div className="job-grid">
-            {chatResponse.recommendations.map((recommendation) => (
-              <JobCard key={recommendation.job.job_id} job={recommendation.job} recommendation={recommendation} />
+            {chatResponse.recommendations.map((recommendation, index) => (
+              <JobCard key={recommendation.job.job_id} job={recommendation.job} recommendation={recommendation} position={index + 1} applicationStatus={chatResponse.applications.find((item) => item.job_id === recommendation.job.job_id)} onApplyJob={onApplyJob} />
             ))}
           </div>
         )}
         {showingChatResults && chatResponse && !chatResponse.personalized && chatResponse.jobs.length > 0 && (
           <div className="job-grid">
-            {chatResponse.jobs.map((job) => <JobCard key={job.job_id} job={job} />)}
+            {chatResponse.jobs.map((job, index) => <JobCard key={job.job_id} job={job} position={index + 1} applicationStatus={chatResponse.applications.find((item) => item.job_id === job.job_id)} onApplyJob={onApplyJob} />)}
           </div>
         )}
         {!showMatches && !showingChatResults && state === 'error' && (
@@ -209,7 +245,7 @@ export function JobResults({ profile, chatResponse }: { profile: ResumeProfile |
         )}
         {!showMatches && !showingChatResults && state === 'success' && (
           <div className="job-grid">
-            {page?.jobs.map((job) => <JobCard key={job.job_id} job={job} />)}
+            {page?.jobs.map((job, index) => <JobCard key={job.job_id} job={job} position={index + 1} onApplyJob={onApplyJob} />)}
           </div>
         )}
       </div>

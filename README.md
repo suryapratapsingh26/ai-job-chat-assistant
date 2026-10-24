@@ -43,6 +43,8 @@ The existing `GET /health` endpoint returns API status. `GET /api/jobs?offset=0&
 
 `POST /api/chat` accepts a message, optional parsed profile, recent conversation turns, active filters, and current result IDs. It returns an assistant message, the selected intent, bounded job results, active filters, and personalized match details when a profile is present. The orchestrator uses Groq strict JSON Schema output to extract a closed intent/filter schema, validates it, then runs deterministic filtering and the existing matcher locally. The model never receives the job dataset or selects job IDs/scores; the parsed resume profile is also kept out of the intent prompt. Only the current message, up to 12 prior turns, and active filter state are sent to Groq. No conversation state is persisted by this application.
 
+Application tracking is local to this backend instance and stored separately in `data/applications.json`. `POST /api/applications` with `{ "job_id": "..." }` records an application; `GET /api/applications` lists saved records with job details. Chat also supports requests such as “apply to job 3” and “show my applied jobs.” Numbered chat references resolve against the currently displayed results; duplicates are rejected. This records application intent and status only—the user submits the application on the employer's site.
+
 ## Frontend
 
 In a second terminal:

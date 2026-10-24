@@ -11,6 +11,7 @@ from backend.app.agents.orchestrator import (
 from backend.app.models.chat import ChatRequest, ChatResponse
 from backend.app.models.job import Job
 from backend.app.services.job_dataset import JobDataset
+from backend.app.services.application_service import ApplicationStorageError
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 dataset = JobDataset()
@@ -27,6 +28,7 @@ def get_orchestrator() -> JobChatOrchestrator:
 @router.post("", response_model=ChatResponse, responses={
     502: {"model": ChatResponse, "description": "Intent planning failed"},
     503: {"model": ChatResponse, "description": "Groq configuration required"},
+    500: {"model": ChatResponse, "description": "Application storage unavailable"},
 })
 def chat(
     request: ChatRequest,
@@ -51,5 +53,11 @@ def chat(
         message = str(exc)
         return JSONResponse(
             status_code=502,
+            content=ChatResponse(assistant_message=message, intent="error", error=message).model_dump(mode="json"),
+        )
+    except ApplicationStorageError:
+        message = "Application records are unavailable. Please try again later."
+        return JSONResponse(
+            status_code=500,
             content=ChatResponse(assistant_message=message, intent="error", error=message).model_dump(mode="json"),
         )

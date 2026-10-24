@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from backend.app.models.application import ApplicationWithJob
 from backend.app.models.job import Job
 from backend.app.models.matching import JobRecommendation
 from backend.app.models.resume import ResumeProfile
@@ -13,6 +14,8 @@ class ChatIntent(StrEnum):
     REFINE_JOBS = "refine_jobs"
     EXPLAIN_JOB = "explain_job"
     SHOW_JOBS = "show_jobs"
+    APPLY_JOB = "apply_job"
+    LIST_APPLICATIONS = "list_applications"
     GENERAL = "general"
     ERROR = "error"
 
@@ -22,6 +25,8 @@ class IntentAction(StrEnum):
     REFINE_JOBS = "refine_jobs"
     EXPLAIN_JOB = "explain_job"
     SHOW_JOBS = "show_jobs"
+    APPLY_JOB = "apply_job"
+    LIST_APPLICATIONS = "list_applications"
     GENERAL = "general"
 
 
@@ -58,7 +63,8 @@ class ChatRequest(BaseModel):
     profile: ResumeProfile | None = None
     history: list[ChatTurn] = Field(default_factory=list, max_length=20)
     active_filters: ChatFilters = Field(default_factory=ChatFilters)
-    current_job_ids: list[str] = Field(default_factory=list, max_length=100)
+    current_job_ids: list[str] = Field(default_factory=list, max_length=1800)
+    selected_job_id: str | None = None
 
 
 class IntentPlan(BaseModel):
@@ -75,6 +81,7 @@ class IntentPlan(BaseModel):
     replace_skills: bool
     clear_filters: bool
     explanation_index: int | None = Field(ge=0, le=23)
+    job_reference: int | None = Field(default=None, ge=1, le=1800)
 
 
 class ChatResponse(BaseModel):
@@ -82,6 +89,7 @@ class ChatResponse(BaseModel):
     intent: ChatIntent
     jobs: list[Job] = Field(default_factory=list)
     recommendations: list[JobRecommendation] = Field(default_factory=list)
+    applications: list[ApplicationWithJob] = Field(default_factory=list)
     active_filters: ChatFilters = Field(default_factory=ChatFilters)
     personalized: bool = False
     error: str | None = None

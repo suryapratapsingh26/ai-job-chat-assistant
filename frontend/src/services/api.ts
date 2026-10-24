@@ -63,12 +63,20 @@ export interface ChatTurn {
 
 export interface ChatResponse {
   assistant_message: string
-  intent: 'search_jobs' | 'refine_jobs' | 'explain_job' | 'show_jobs' | 'general' | 'error'
+  intent: 'search_jobs' | 'refine_jobs' | 'explain_job' | 'show_jobs' | 'apply_job' | 'list_applications' | 'general' | 'error'
   jobs: Job[]
   recommendations: JobRecommendation[]
+  applications: JobApplication[]
   active_filters: ChatFilters
   personalized: boolean
   error: string | null
+}
+
+export interface JobApplication {
+  job_id: string
+  applied_at: string
+  status: 'applied'
+  job: Job | null
 }
 
 export const chatService = {
@@ -78,6 +86,7 @@ export const chatService = {
     history: ChatTurn[],
     activeFilters: ChatFilters,
     currentJobIds: string[],
+    selectedJobId?: string,
   ): Promise<ChatResponse> {
     let response: Response
     try {
@@ -89,7 +98,8 @@ export const chatService = {
           profile,
           history: history.slice(-20),
           active_filters: activeFilters,
-          current_job_ids: currentJobIds.slice(0, 100),
+          current_job_ids: currentJobIds.slice(0, 1800),
+          selected_job_id: selectedJobId,
         }),
       })
     } catch {
