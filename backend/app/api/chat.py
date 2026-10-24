@@ -10,8 +10,8 @@ from backend.app.agents.orchestrator import (
 )
 from backend.app.models.chat import ChatRequest, ChatResponse
 from backend.app.models.job import Job
-from backend.app.services.job_dataset import JobDataset
 from backend.app.services.application_service import ApplicationStorageError
+from backend.app.services.job_dataset import JobDataset
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 dataset = JobDataset()
