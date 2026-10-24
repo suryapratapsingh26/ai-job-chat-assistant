@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from backend.app import main
 from backend.app.agents.orchestrator import JobChatOrchestrator
 from backend.app.api import applications as applications_api
+from backend.app.api import chat as chat_api
 from backend.app.models.chat import ChatRequest, IntentAction, IntentPlan
 from backend.app.models.job import Job
 from backend.app.services.application_service import (
@@ -158,3 +159,23 @@ def test_chat_selected_job_context_resolves_this_job_from_multiple_results(tmp_p
         [first, second],
     )
     assert response.applications[0].job_id == second.job_id
+
+
+def test_chat_endpoint_serializes_application_and_uses_visible_job_context(monkeypatch, tmp_path):
+    first, second = make_job("job-1"), make_job("job-2", "Data Engineer")
+    service = ApplicationService(tmp_path / "applications.json")
+    orchestrator = JobChatOrchestrator(FakeParser(make_plan(IntentAction.APPLY_JOB, 2)), service)
+    monkeypatch.setitem(main.app.dependency_overrides, chat_api.get_jobs, lambda: [first, second])
+    monkeypatch.setitem(main.app.dependency_overrides, chat_api.get_orchestrator, lambda: orchestrator)
+    client = TestClient(main.app)
+
+    response = client.post("/api/chat", json={
+        "message": "Apply to job 2",
+        "current_job_ids": [first.job_id, second.job_id],
+    })
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["intent"] == "apply_job"
+    assert [job["job_id"] for job in body["jobs"]] == [second.job_id]
+    assert body["applications"][0]["job"]["job_id"] == second.job_id
