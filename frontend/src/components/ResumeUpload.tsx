@@ -19,6 +19,13 @@ export function ResumeUpload({ onProfileParsed }: { onProfileParsed: (profile: R
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [profile, setProfile] = useState<ResumeProfile | null>(null)
+  const statusNote = uploading
+    ? 'Extracting text and preparing your profile. Your file is not stored.'
+    : error
+      ? 'No profile was created. Your file is not stored.'
+      : profile
+        ? 'Resume processed successfully. Your file is not stored.'
+        : ''
 
   async function selectFile(file?: File) {
     if (!file) return
@@ -87,13 +94,11 @@ export function ResumeUpload({ onProfileParsed }: { onProfileParsed: (profile: R
           disabled={uploading}
           accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           onChange={onChange}
-          aria-describedby={error ? 'resume-error resume-note' : 'resume-note'}
+          aria-describedby={error ? 'resume-error resume-note' : statusNote ? 'resume-note' : undefined}
         />
       </label>
       {error && <p className="field-error" id="resume-error" role="alert">{error}</p>}
-      <p className="privacy-note" id="resume-note" aria-live="polite">
-        {uploading ? 'Extracting text and preparing your profile. Your file is not stored.' : error ? 'No profile was created. Your file is not stored.' : profile ? 'Resume processed successfully. Your file is not stored.' : 'Your resume is processed in memory and is not stored.'}
-      </p>
+      {statusNote && <p className="privacy-note" id="resume-note" aria-live="polite">{statusNote}</p>}
       {profile && <ParsedProfile profile={profile} />}
     </section>
   )

@@ -13,9 +13,9 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <a className="brand" href="#main" aria-label="Pathfinder home">
+        <a className="brand" href="#main" aria-label="JobFinder home">
           <BrandMark />
-          <span className="brand-name">pathfinder<span className="brand-period">.</span></span>
+          <span className="brand-name">JobFinder</span>
         </a>
         <div className="header-right">
           <span className="header-label">AI JOB CHAT ASSISTANT</span>
@@ -42,10 +42,6 @@ export default function App() {
           />
         </div>
       </main>
-      <footer className="app-footer">
-        <span>Built to make your next move clearer.</span>
-        <span>Chat results can be general or personalized with your resume.</span>
-      </footer>
     </div>
   )
 }

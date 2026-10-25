@@ -13,7 +13,7 @@ export function ChatInput({ onSend, disabled = false }: { onSend: (message: stri
 
   return (
     <form className="chat-composer" onSubmit={submit}>
-      <label className="sr-only" htmlFor="chat-message">Message Pathfinder</label>
+      <label className="sr-only" htmlFor="chat-message">Message JobFinder</label>
       <textarea
         id="chat-message"
         disabled={disabled}
