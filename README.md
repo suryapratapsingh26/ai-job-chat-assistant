@@ -29,6 +29,16 @@ The backend is divided into separate parts for resume parsing, job matching, job
 
 Groq is used to understand what the user wants from the conversation. The actual job filtering, matching, and application handling are done by the backend.
 
+## Data Flow
+
+1. The user uploads a PDF or DOCX resume through the React frontend.
+2. The FastAPI backend parses the resume and extracts a structured candidate profile.
+3. The matching service compares the profile against the job dataset and generates ranked job recommendations.
+4. Chat requests are sent to the backend orchestrator, which uses Groq to understand the requested action or refinement.
+5. The backend applies deterministic job filters, matching logic, or application actions based on the interpreted request.
+6. When a user applies to a job, the application record is saved with the job ID, application date, and status.
+7. Application status requests retrieve the saved application records and return them to the frontend.
+
 ## Job Data
 
 The project uses a dataset of around 1,800 real job listings collected from public job sources.
@@ -36,6 +46,26 @@ The project uses a dataset of around 1,800 real job listings collected from publ
 Each job contains information such as the title, company, location, skills, description, and source link.
 
 The scraper and validation scripts are included in the `scripts` folder.
+
+## API Endpoints
+
+### Resume
+
+- `POST /api/resume/parse` — upload and parse a PDF/DOCX resume.
+
+### Jobs
+
+- `GET /api/jobs` — retrieve available job listings.
+- `POST /api/jobs/match` — generate job recommendations based on a candidate profile.
+
+### Chat
+
+- `POST /api/chat` — process conversational job-search, refinement, application, and application-status requests.
+
+### Applications
+
+- `POST /api/applications` — record an application.
+- `GET /api/applications` — retrieve recorded applications.
 
 ## Run Locally
 
@@ -69,11 +99,3 @@ data/       Job data and applications
 scripts/    Job scraper and validation
 tests/      Tests
 ```
-
-## Testing
-
-The backend tests, frontend build, and end-to-end workflow have been tested locally.
-
-## Note
-
-The application records an application locally. It does not submit the application to the employer's website.
