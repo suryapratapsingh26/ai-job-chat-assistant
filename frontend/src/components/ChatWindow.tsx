@@ -7,7 +7,7 @@ import { chatService, type ChatFilters, type ChatResponse, type ChatTurn, type R
 const welcome: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
-  text: 'Welcome. Tell me the role, skills, location, or work style you want. Upload a resume to personalize recommendations, then refine the results here.',
+  text: 'Welcome. Upload a PDF or DOCX resume to see your profile and personalized job recommendations. Then refine your matches here in chat.',
 }
 
 const emptyFilters: ChatFilters = { skills: [], location: null, remote: null, role: null, experience_level: null }
@@ -23,7 +23,6 @@ export function ChatWindow({ profile, onResponse, visibleJobIds, applyRequest, o
   const [activeFilters, setActiveFilters] = useState<ChatFilters>(emptyFilters)
   const [sending, setSending] = useState(false)
   const handledApplyRequest = useRef<string | null>(null)
-  const hasStartedChat = messages.some((message) => message.role === 'user')
 
   useEffect(() => {
     if (!applyRequest || handledApplyRequest.current === applyRequest.requestId) return
@@ -62,19 +61,6 @@ export function ChatWindow({ profile, onResponse, visibleJobIds, applyRequest, o
       <div className="conversation-body">
         <MessageList messages={messages} />
         {sending && <div className="chat-typing" role="status">JobFinder is searching…</div>}
-        {!hasStartedChat && (
-          <div className="workflow-card">
-            <div className="workflow-title">Your job search, in five steps</div>
-            <ol className="workflow-list">
-              <li><span>01</span> Add your resume</li>
-              <li><span>02</span> Review profile matches</li>
-              <li><span>03</span> Search the job dataset</li>
-              <li><span>04</span> Refine results in chat</li>
-              <li><span>05</span> Track applications here</li>
-            </ol>
-            <p className="workflow-note">Ask “apply to job 1” to record an application. JobFinder tracks its status; submit applications on the employer site.</p>
-          </div>
-        )}
       </div>
       <ChatInput onSend={sendMessage} disabled={sending} />
     </section>

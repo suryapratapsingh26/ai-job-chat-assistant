@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
-import { jobService, matchingService } from '../services/api'
+import { matchingService } from '../services/api'
 import type { ChatResponse, JobMatchResponse, JobRecommendation, ResumeProfile } from '../services/api'
-import type { Job, JobPage } from '../types/job'
+import type { Job } from '../types/job'
 import { LoadingIndicator } from './LoadingIndicator'
-
-type LoadState = 'loading' | 'success' | 'empty' | 'error'
 
 function JobCard({ job, recommendation, position, applicationStatus, onApplyJob }: {
   job: Job
@@ -52,27 +50,12 @@ function JobCard({ job, recommendation, position, applicationStatus, onApplyJob 
   )
 }
 
-function LoadingCards() {
-  return (
-    <LoadingIndicator label="Loading job listings">
-      <div className="job-loading">
-        {[1, 2, 3].map((item) => <div className="skeleton-card" key={item}><span /><span /><span /><span /></div>)}
-      </div>
-    </LoadingIndicator>
-  )
-}
-
 export function JobResults({ profile, chatResponse, onVisibleJobs, onApplyJob }: {
   profile: ResumeProfile | null
   chatResponse: ChatResponse | null
   onVisibleJobs: (jobIds: string[]) => void
   onApplyJob: (jobId: string) => void
 }) {
-  const [page, setPage] = useState<JobPage | null>(null)
-  const [state, setState] = useState<LoadState>('loading')
-  const [error, setError] = useState('')
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [moreError, setMoreError] = useState('')
   const [recommendations, setRecommendations] = useState<JobMatchResponse | null>(null)
   const [matching, setMatching] = useState(false)
   const [matchError, setMatchError] = useState('')
@@ -87,6 +70,8 @@ export function JobResults({ profile, chatResponse, onVisibleJobs, onApplyJob }:
     setMatchError('')
     setShowMatches(false)
     setShowChatResults(false)
+    if (profile) void findMatches()
+    else onVisibleJobs([])
   }, [profile])
 
   useEffect(() => {
@@ -103,10 +88,10 @@ export function JobResults({ profile, chatResponse, onVisibleJobs, onApplyJob }:
       onVisibleJobs(matching || !recommendations
         ? []
         : recommendations.recommendations.map((item) => item.job.job_id))
-    } else if (page) {
-      onVisibleJobs(page.jobs.map((job) => job.job_id))
+    } else {
+      onVisibleJobs([])
     }
-  }, [showingChatResults, chatResponse, showMatches, matching, recommendations, page, onVisibleJobs])
+  }, [showingChatResults, chatResponse, showMatches, matching, recommendations, onVisibleJobs])
 
   async function findMatches() {
     if (!profile) return
@@ -124,37 +109,6 @@ export function JobResults({ profile, chatResponse, onVisibleJobs, onApplyJob }:
     }
   }
 
-  async function loadJobs(offset = 0) {
-    if (offset === 0) {
-      setState('loading')
-      setError('')
-    } else {
-      setLoadingMore(true)
-      setMoreError('')
-    }
-    try {
-      const result = await jobService.list(offset)
-      const visibleJobs = offset > 0 && page ? [...page.jobs, ...result.jobs] : result.jobs
-      setPage((current) => offset > 0 && current
-        ? { ...result, jobs: [...current.jobs, ...result.jobs] }
-        : result)
-      onVisibleJobs(visibleJobs.map((job) => job.job_id))
-      if (offset === 0) setState(result.jobs.length ? 'success' : 'empty')
-    } catch (reason) {
-      const message = reason instanceof Error ? reason.message : 'Could not load job listings.'
-      if (offset === 0) {
-        setError(message)
-        setState('error')
-      } else {
-        setMoreError(message)
-      }
-    } finally {
-      if (offset > 0) setLoadingMore(false)
-    }
-  }
-
-  useEffect(() => { void loadJobs() }, [])
-
   return (
     <aside className="results-panel" aria-labelledby="jobs-heading">
       <div className="results-heading">
@@ -164,27 +118,25 @@ export function JobResults({ profile, chatResponse, onVisibleJobs, onApplyJob }:
               ? chatResponse?.intent === 'list_applications' || chatResponse?.intent === 'apply_job'
                 ? 'APPLICATION TRACKING'
                 : chatResponse?.personalized ? 'RESUME MATCHES' : 'GENERAL SEARCH'
-              : showMatches ? 'PERSONALIZED FROM YOUR PROFILE' : 'EXPLORE'}
+              : profile ? 'PERSONALIZED FROM YOUR PROFILE' : 'YOUR PROFILE'}
           </div>
           <h2 id="jobs-heading">{showingChatResults
             ? chatResponse?.intent === 'list_applications' ? 'Applied jobs' : chatResponse?.intent === 'apply_job' ? 'Application' : 'Chat results'
-            : showMatches ? 'Recommended jobs' : 'Job listings'}</h2>
+            : 'Recommended jobs'}</h2>
         </div>
         {showingChatResults && <span className="results-count">{chatResponse?.intent === 'list_applications' ? chatResponse.applications.length : chatResponse?.jobs.length ?? 0} {chatResponse?.intent === 'list_applications' ? 'applications' : 'jobs'}</span>}
         {showMatches && !matching && recommendations && <span className="results-count">{recommendations.total_matches.toLocaleString()} matches</span>}
-        {profile && !showMatches && !showingChatResults && <button type="button" className="primary-action" onClick={() => void findMatches()}>Find matching jobs</button>}
-        {(showMatches || showingChatResults) && <button type="button" className="text-button" onClick={() => { setShowMatches(false); setShowChatResults(false) }}>All listings</button>}
+        {showingChatResults && <button type="button" className="text-button" onClick={() => { setShowMatches(Boolean(profile)); setShowChatResults(false) }}>Recommendations</button>}
       </div>
       <p className="results-intro">
         {showingChatResults
           ? chatResponse?.intent === 'list_applications' ? 'Your saved applications and their current statuses.'
             : chatResponse?.intent === 'apply_job' ? 'Application status is recorded locally. Submit the application on the employer site.'
               : chatResponse?.personalized ? 'Ranked resume matches refined by your conversation.' : 'General listings filtered from the existing job dataset. No resume match score is applied.'
-          : showMatches ? 'Ranked by skills, role, experience, and relevant resume details.' : 'General opportunities from our job dataset.'}
+          : 'Upload a resume to see job recommendations based on your profile.'}
       </p>
       {showingChatResults && chatResponse && !['apply_job', 'list_applications'].includes(chatResponse.intent) && <ActiveFilters filters={chatResponse.active_filters} />}
       <div className="results-scroll" aria-label="Job listings">
-        {!showMatches && !showingChatResults && state === 'loading' && <LoadingCards />}
         {showMatches && matching && <LoadingIndicator label="Finding jobs that fit your profile"><div className="match-loading-space" /></LoadingIndicator>}
         {showMatches && !matching && matchError && (
           <div className="results-message error-state" role="alert">
@@ -227,39 +179,7 @@ export function JobResults({ profile, chatResponse, onVisibleJobs, onApplyJob }:
             {chatResponse.jobs.map((job, index) => <JobCard key={job.job_id} job={job} position={index + 1} applicationStatus={chatResponse.applications.find((item) => item.job_id === job.job_id)} onApplyJob={onApplyJob} />)}
           </div>
         )}
-        {!showMatches && !showingChatResults && state === 'error' && (
-          <div className="results-message error-state" role="alert">
-            <span className="state-icon">!</span>
-            <h3>Listings aren’t available</h3>
-            <p>{error} Check that the FastAPI server is running, then try again.</p>
-            <button type="button" className="text-button" onClick={() => void loadJobs()}>Try again <span aria-hidden="true">↻</span></button>
-          </div>
-        )}
-        {!showMatches && !showingChatResults && state === 'empty' && (
-          <div className="results-message">
-            <span className="state-icon">⌕</span>
-            <h3>No listings yet</h3>
-            <p>The dataset is empty. Add job listings to the backend dataset and refresh.</p>
-            <button type="button" className="text-button" onClick={() => void loadJobs()}>Refresh listings <span aria-hidden="true">↻</span></button>
-          </div>
-        )}
-        {!showMatches && !showingChatResults && state === 'success' && (
-          <div className="job-grid">
-            {page?.jobs.map((job, index) => <JobCard key={job.job_id} job={job} position={index + 1} onApplyJob={onApplyJob} />)}
-          </div>
-        )}
       </div>
-      {!showMatches && !showingChatResults && state === 'success' && page && (
-        <div className="results-footer">
-          <p className="listings-footnote">Showing {page.jobs.length} of {page.total.toLocaleString()} available listings.</p>
-          {moreError && <p className="field-error" role="alert">{moreError}</p>}
-          {page.total > page.jobs.length && (
-            <button type="button" className="text-button" disabled={loadingMore} onClick={() => void loadJobs(page.jobs.length)}>
-              {loadingMore ? 'Loading…' : 'Load more listings'}
-            </button>
-          )}
-        </div>
-      )}
     </aside>
   )
 }

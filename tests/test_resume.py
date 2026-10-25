@@ -5,6 +5,8 @@ from io import BytesIO
 from docx import Document
 
 from backend.app.main import app
+from backend.app.api import jobs as jobs_api
+from backend.app.models.job import Job
 from backend.app.services.resume_parser import ResumeProcessingError, parse_profile, parse_resume_document
 
 
@@ -199,3 +201,49 @@ def test_resume_parse_endpoint_returns_profile_and_clear_errors():
     status, payload = call_asgi("POST", "/api/resume/parse", body, f"multipart/form-data; boundary={boundary}")
     assert status == 400
     assert "Choose a PDF or DOCX" in payload["detail"]
+
+
+def test_parsed_resume_profile_produces_personalized_job_recommendations(monkeypatch):
+    job = Job(
+        job_id="software-engineer",
+        title="Software Engineer",
+        company="Example Co",
+        location="Remote",
+        experience="3+ years",
+        skills=["Python", "React"],
+        description="Build software products with Python and React.",
+        source_link="https://example.com/software-engineer",
+    )
+    monkeypatch.setattr(jobs_api.dataset, "load", lambda: [job])
+
+    boundary, body = multipart("resume.pdf", "application/pdf", make_text_pdf([
+        "Jane Doe",
+        "Software Engineer",
+        "jane.doe@example.com",
+        "Skills",
+        "Python, React",
+        "Experience",
+        "Software Engineer at Example Co (2022-2025)",
+        "Education",
+        "B.S. Computer Science, Example University",
+        "Projects",
+        "Built a scheduling tool",
+    ]))
+    status, parsed = call_asgi(
+        "POST", "/api/resume/parse", body,
+        f"multipart/form-data; boundary={boundary}",
+    )
+    assert status == 200
+    profile = parsed["profile"]
+    assert profile["name"] == "Jane Doe"
+    assert profile["skills"] == ["Python", "React"]
+
+    status, match_response = call_asgi(
+        "POST", "/api/jobs/match", json.dumps({"profile": profile}).encode(), "application/json",
+    )
+    assert status == 200
+    recommendation = match_response["recommendations"][0]
+    assert recommendation["job"]["job_id"] == "software-engineer"
+    assert recommendation["match_score"] > 0
+    assert recommendation["matched_skills"] == ["Python", "React"]
+    assert recommendation["match_reasons"]

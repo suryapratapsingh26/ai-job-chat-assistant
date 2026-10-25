@@ -106,19 +106,24 @@ def test_application_api_handles_apply_duplicate_invalid_and_list(monkeypatch, t
     assert listed.json()["applications"][0]["job"]["job_id"] == job.job_id
 
 
-def test_chat_apply_uses_one_based_visible_result_reference_and_lists_status(tmp_path):
-    jobs = [make_job("job-1", "First Engineer"), make_job("job-2", "Second Engineer")]
+def test_chat_apply_job_three_uses_visible_result_reference_and_lists_status(tmp_path):
+    jobs = [
+        make_job("job-1", "First Engineer"),
+        make_job("job-2", "Second Engineer"),
+        make_job("job-3", "Third Engineer"),
+    ]
     service = ApplicationService(tmp_path / "applications.json")
-    chat = JobChatOrchestrator(FakeParser(make_plan(IntentAction.APPLY_JOB, 2)), service)
+    visible_job_ids = ["job-3", "job-1", "job-2"]
+    chat = JobChatOrchestrator(FakeParser(make_plan(IntentAction.APPLY_JOB, 3)), service)
     applied = chat.handle(
-        ChatRequest(message="apply to job 2", current_job_ids=["job-1", "job-2"]), jobs,
+        ChatRequest(message="apply to job 3", current_job_ids=visible_job_ids), jobs,
     )
     assert applied.jobs[0].job_id == "job-2"
     assert applied.applications[0].status.value == "applied"
     assert "Second Engineer" in applied.assistant_message
 
     duplicate = chat.handle(
-        ChatRequest(message="apply to job 2", current_job_ids=["job-1", "job-2"]), jobs,
+        ChatRequest(message="apply to job 3", current_job_ids=visible_job_ids), jobs,
     )
     assert "already applied" in duplicate.assistant_message
 
