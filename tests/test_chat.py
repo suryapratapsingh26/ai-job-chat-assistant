@@ -269,6 +269,35 @@ def test_followup_refinement_keeps_existing_constraints_and_replaces_skill():
     assert [job.job_id for job in second.jobs] == ["remote-backend"]
 
 
+def test_conversational_refinement_keeps_recommendations_personalized():
+    jobs = [
+        make_job("remote-react", "Backend Engineer", "Remote", ["Python", "React"]),
+        make_job("remote-python", "Backend Engineer", "Remote", ["Python"]),
+        make_job("onsite-react", "Backend Engineer", "Berlin", ["Python", "React"]),
+    ]
+    profile = ResumeProfile(designation="Backend Engineer", skills=["Python", "React"])
+    orchestrator = JobChatOrchestrator(FakeParser(
+        make_plan(remote=True),
+        make_plan(IntentAction.REFINE_JOBS, skills=["React"], replace_skills=True),
+    ))
+
+    remote = orchestrator.handle(ChatRequest(message="show only remote roles", profile=profile), jobs)
+    refined = orchestrator.handle(ChatRequest(
+        message="jobs needing React",
+        profile=profile,
+        active_filters=remote.active_filters,
+        current_job_ids=[job.job_id for job in remote.jobs],
+    ), jobs)
+
+    assert remote.personalized is True
+    assert [job.job_id for job in remote.jobs] == ["remote-react", "remote-python"]
+    assert len(remote.recommendations) == 2
+    assert refined.personalized is True
+    assert [job.job_id for job in refined.jobs] == ["remote-react"]
+    assert refined.recommendations[0].match_score > 0
+    assert refined.recommendations[0].match_reasons
+
+
 def test_no_result_search_suggests_relaxing_filters():
     response = JobChatOrchestrator(FakeParser(make_plan(skills=["Rust"], location="India"))).handle(
         ChatRequest(message="Show remote Rust roles in India"),
