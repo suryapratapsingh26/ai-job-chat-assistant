@@ -106,33 +106,52 @@ def test_application_api_handles_apply_duplicate_invalid_and_list(monkeypatch, t
     assert listed.json()["applications"][0]["job"]["job_id"] == job.job_id
 
 
-def test_chat_apply_job_three_uses_visible_result_reference_and_lists_status(tmp_path):
+def test_chat_apply_job_four_persists_actual_job_and_lists_persisted_status(tmp_path):
     jobs = [
         make_job("job-1", "First Engineer"),
         make_job("job-2", "Second Engineer"),
         make_job("job-3", "Third Engineer"),
+        make_job("job-4", "Fourth Engineer"),
     ]
     service = ApplicationService(tmp_path / "applications.json")
-    visible_job_ids = ["job-3", "job-1", "job-2"]
-    chat = JobChatOrchestrator(FakeParser(make_plan(IntentAction.APPLY_JOB, 3)), service)
+    visible_job_ids = ["job-3", "job-1", "job-4", "job-2"]
+    chat = JobChatOrchestrator(FakeParser(make_plan(IntentAction.APPLY_JOB, 4)), service)
     applied = chat.handle(
-        ChatRequest(message="apply to job 3", current_job_ids=visible_job_ids), jobs,
+        ChatRequest(message="apply to job 4", current_job_ids=visible_job_ids), jobs,
     )
     assert applied.jobs[0].job_id == "job-2"
+    assert applied.applications[0].job_id == "job-2"
     assert applied.applications[0].status.value == "applied"
     assert "Second Engineer" in applied.assistant_message
 
     duplicate = chat.handle(
-        ChatRequest(message="apply to job 3", current_job_ids=visible_job_ids), jobs,
+        ChatRequest(message="apply to job 4", current_job_ids=visible_job_ids), jobs,
     )
     assert "already applied" in duplicate.assistant_message
 
     listed = JobChatOrchestrator(FakeParser(make_plan(IntentAction.LIST_APPLICATIONS)), service).handle(
-        ChatRequest(message="show my applied jobs"), jobs,
+        ChatRequest(message="show my applied jobs", current_job_ids=[]), jobs,
     )
     assert listed.intent.value == "list_applications"
     assert [job.job_id for job in listed.jobs] == ["job-2"]
     assert listed.applications[0].status.value == "applied"
+    assert listed.assistant_message == "You have 1 recorded application."
+    assert len(service.list_applications(jobs)) == 1
+
+
+def test_applying_preserves_existing_application_records(tmp_path):
+    jobs = [make_job(f"job-{index}", f"Engineer {index}") for index in range(1, 5)]
+    service = ApplicationService(tmp_path / "applications.json")
+    existing = service.apply("job-1", jobs)
+
+    applied = JobChatOrchestrator(FakeParser(make_plan(IntentAction.APPLY_JOB, 4)), service).handle(
+        ChatRequest(message="apply to job 4", current_job_ids=[job.job_id for job in jobs]), jobs,
+    )
+    persisted = service.list_applications(jobs)
+
+    assert applied.applications[0].job_id == "job-4"
+    assert {record.job_id for record in persisted} == {existing.job_id, "job-4"}
+    assert len(persisted) == 2
 
 
 def test_chat_application_rejects_invalid_reference_and_resolves_this_when_unambiguous(tmp_path):
