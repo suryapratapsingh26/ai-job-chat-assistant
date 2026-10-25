@@ -10,7 +10,7 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
     <article className={`message-row${isUser ? ' user-message' : ''}`}>
       {!isUser && <span className="assistant-avatar" aria-hidden="true">✳</span>}
       <div className="message-content">
-        <div className="message-author">{isUser ? 'You' : 'Pathfinder'}</div>
+        <div className="message-author">{isUser ? 'You' : 'JobFinder'}</div>
         <div className={`message-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'}`}>
           {message.text}
         </div>

@@ -23,6 +23,7 @@ export function ChatWindow({ profile, onResponse, visibleJobIds, applyRequest, o
   const [activeFilters, setActiveFilters] = useState<ChatFilters>(emptyFilters)
   const [sending, setSending] = useState(false)
   const handledApplyRequest = useRef<string | null>(null)
+  const hasStartedChat = messages.some((message) => message.role === 'user')
 
   useEffect(() => {
     if (!applyRequest || handledApplyRequest.current === applyRequest.requestId) return
@@ -57,22 +58,23 @@ export function ChatWindow({ profile, onResponse, visibleJobIds, applyRequest, o
           <div className="section-eyebrow">YOUR WORKSPACE</div>
           <h1 id="conversation-heading">Let’s find your next role.</h1>
         </div>
-        <span className="connection-status"><span /> Job assistant ready</span>
       </div>
       <div className="conversation-body">
         <MessageList messages={messages} />
-        {sending && <div className="chat-typing" role="status">Pathfinder is searchingâ€¦</div>}
-        <div className="workflow-card">
-          <div className="workflow-title">Your job search, in five steps</div>
-          <ol className="workflow-list">
-            <li><span>01</span> Add your resume</li>
-            <li><span>02</span> Review profile matches</li>
-            <li><span>03</span> Search the job dataset</li>
-            <li><span>04</span> Refine results in chat</li>
-            <li><span>05</span> Track applications here</li>
-          </ol>
-          <p className="workflow-note">Ask “apply to job 1” to record an application. Pathfinder tracks its status; submit applications on the employer site.</p>
-        </div>
+        {sending && <div className="chat-typing" role="status">JobFinder is searching…</div>}
+        {!hasStartedChat && (
+          <div className="workflow-card">
+            <div className="workflow-title">Your job search, in five steps</div>
+            <ol className="workflow-list">
+              <li><span>01</span> Add your resume</li>
+              <li><span>02</span> Review profile matches</li>
+              <li><span>03</span> Search the job dataset</li>
+              <li><span>04</span> Refine results in chat</li>
+              <li><span>05</span> Track applications here</li>
+            </ol>
+            <p className="workflow-note">Ask “apply to job 1” to record an application. JobFinder tracks its status; submit applications on the employer site.</p>
+          </div>
+        )}
       </div>
       <ChatInput onSend={sendMessage} disabled={sending} />
     </section>
